@@ -37,6 +37,7 @@ void setFlag(void) {
 
 void handleReceivedPacket();
 void sendPong();
+void sendSysInfo();
 
 void setup() {
   Serial.begin(115200);
@@ -55,7 +56,8 @@ void setup() {
     Serial.println(state);
     while (true);
   }
-  lora.setDio1Action(setFlag);
+  //lora.setDio1Action(setFlag);
+  lora.setDio0Action(setFlag);
   
   // start listening for LoRa packets
   Serial.print(F("[SX12x8] Starting to listen ... "));
@@ -71,7 +73,7 @@ void setup() {
   Serial.println("*****************************************");
   Serial.println("********* List of commands **************");
   Serial.println("'p' - Pong");
-  //Serial.println("'s' - Sys Info");
+  Serial.println("'s' - Sys Info");
   Serial.println("*****************************************");
 }
 
@@ -93,6 +95,10 @@ void loop() {
     switch (c) {
       case 'p':
         sendPong();
+        break;
+      case 's':
+        sendSysInfo();
+        break;
     }
 
     // dump the serial buffer
@@ -113,6 +119,7 @@ void handleReceivedPacket() {
 
   if (state == ERR_NONE) {
     PRINT_BUFF(respFrame, respLen);
+    Serial.println();
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed
     Serial.println(F("[SX12x8] CRC error!"));
@@ -138,4 +145,125 @@ void sendPong() {
     Serial.print(F("failed, code "));
     Serial.println(state);
   }
+
+  Serial.println();
+}
+
+void sendSysInfo() {
+  size_t optDataLen = 6*sizeof(uint8_t) + 3*sizeof(int16_t) + sizeof(uint16_t) + sizeof(int8_t);
+  uint8_t* optData = new uint8_t[optDataLen];
+  uint8_t* optDataPtr = optData;
+
+  Serial.println(F("System info:"));
+
+  // set batteryChargingVoltage variable
+  uint8_t batteryChargingVoltage = ((float)random(1800, 3600) / 1000.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
+  memcpy(optDataPtr, &batteryChargingVoltage, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+  Serial.print(batteryChargingVoltage);
+  Serial.print('*');
+  Serial.print(VOLTAGE_MULTIPLIER);
+  Serial.println(F(" mV"));
+
+  // set batteryChragingCurrent variable
+  int16_t batteryChragingCurrent = ((float)random(-50000, 50000) / 1000000.0) * (CURRENT_UNIT / CURRENT_MULTIPLIER);
+  memcpy(optDataPtr, &batteryChragingCurrent, sizeof(int16_t));
+  optDataPtr += sizeof(int16_t);
+  Serial.print(batteryChragingCurrent);
+  Serial.print('*');
+  Serial.print(CURRENT_MULTIPLIER);
+  Serial.println(F(" uA"));
+
+  // set batteryVoltage variable
+  uint8_t batteryVoltage = ((float)random(1800, 3600) / 1000.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
+  memcpy(optDataPtr, &batteryVoltage, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+  Serial.print(batteryVoltage);
+  Serial.print('*');
+  Serial.print(VOLTAGE_MULTIPLIER);
+  Serial.println(F(" mV"));
+
+  // set solarCellAVoltage variable
+  uint8_t solarCellAVoltage = ((float)random(0, 330) / 100.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
+  memcpy(optDataPtr, &solarCellAVoltage, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+  Serial.print(solarCellAVoltage);
+  Serial.print('*');
+  Serial.print(VOLTAGE_MULTIPLIER);
+  Serial.println(F(" mV"));
+
+  // set solarCellBVoltage variable
+  uint8_t solarCellBVoltage = ((float)random(0, 330) / 100.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
+  memcpy(optDataPtr, &solarCellBVoltage, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+  Serial.print(solarCellBVoltage);
+  Serial.print('*');
+  Serial.print(VOLTAGE_MULTIPLIER);
+  Serial.println(F(" mV"));
+
+  // set solarCellCVoltage variable
+  uint8_t solarCellCVoltage = ((float)random(0, 330) / 100.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
+  memcpy(optDataPtr, &solarCellCVoltage, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+  Serial.print(solarCellCVoltage);
+  Serial.print('*');
+  Serial.print(VOLTAGE_MULTIPLIER);
+  Serial.println(F(" mV"));
+
+  // set batteryTemperature variable
+  int16_t batteryTemperature = ((float)random(-50000, 120000) / 1000.0) * (TEMPERATURE_UNIT / TEMPERATURE_MULTIPLIER);
+  memcpy(optDataPtr, &batteryTemperature, sizeof(int16_t));
+  optDataPtr += sizeof(int16_t);
+  Serial.print(batteryTemperature);
+  Serial.print('*');
+  Serial.print(TEMPERATURE_MULTIPLIER);
+  Serial.println(F(" mdeg C"));
+
+  // set boardTemperature variable
+  int16_t boardTemperature = ((float)random(-50000, 120000) / 1000.0) * (TEMPERATURE_UNIT / TEMPERATURE_MULTIPLIER);
+  memcpy(optDataPtr, &boardTemperature, sizeof(int16_t));
+  optDataPtr += sizeof(int16_t);
+  Serial.print(boardTemperature);
+  Serial.print('*');
+  Serial.print(TEMPERATURE_MULTIPLIER);
+  Serial.println(F(" mdeg C"));
+
+  // set mcuTemperature variable (read twice since first value is often nonsense)
+  int8_t mcuTemperature = random(0,300) - 150;
+  memcpy(optDataPtr, &mcuTemperature, sizeof(int8_t));
+  optDataPtr += sizeof(int8_t);
+  Serial.println(mcuTemperature);
+
+  // set resetCounter variable
+  uint16_t resetCounter = 3;
+  memcpy(optDataPtr, &resetCounter, sizeof(uint16_t));
+  optDataPtr += sizeof(uint16_t);
+  Serial.println(resetCounter);
+
+  // set powerConfig variable
+  uint8_t powerConfig = 0xFF;
+  Serial.print(F("Config: 0b"));
+  Serial.println(powerConfig, BIN);
+  memcpy(optDataPtr, &powerConfig, sizeof(uint8_t));
+  optDataPtr += sizeof(uint8_t);
+
+  Serial.print(F("Sending sysInfo frame ... "));
+  uint8_t functionId = RESP_SYSTEM_INFO;
+  uint8_t len = FCP_Get_Frame_Length(callsign, optDataLen);
+  uint8_t* frame = new uint8_t[len];
+  FCP_Encode(frame, callsign, functionId, optDataLen, optDataPtr);
+  int state = lora.transmit(frame, len);
+  delete[] frame;
+
+  if (state == ERR_NONE) {
+    Serial.println(F("sent successfully!"));
+  } else {
+    Serial.print(F("failed, code "));
+    Serial.println(state);
+  }
+
+  Serial.println();
+
+  // deallocate memory
+  delete[] optData;
 }
