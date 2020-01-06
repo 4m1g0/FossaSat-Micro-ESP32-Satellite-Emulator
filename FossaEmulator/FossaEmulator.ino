@@ -37,7 +37,7 @@ void setFlag(void) {
 
 void handleReceivedPacket();
 void sendPong();
-void sendSysInfo();
+void sendSysInfo(bool malformed = false);
 
 void setup() {
   Serial.begin(115200);
@@ -74,6 +74,7 @@ void setup() {
   Serial.println("********* List of commands **************");
   Serial.println("'p' - Pong");
   Serial.println("'s' - Sys Info");
+  Serial.println("'m' - malformed packet");
   Serial.println("*****************************************");
 }
 
@@ -98,6 +99,9 @@ void loop() {
         break;
       case 's':
         sendSysInfo();
+        break;
+      case 'm':
+        sendSysInfo(true);
         break;
     }
 
@@ -149,7 +153,7 @@ void sendPong() {
   Serial.println();
 }
 
-void sendSysInfo() {
+void sendSysInfo(bool malformed) {
   size_t optDataLen = 6*sizeof(uint8_t) + 3*sizeof(int16_t) + sizeof(uint16_t) + sizeof(int8_t);
   uint8_t* optData = new uint8_t[optDataLen];
   uint8_t* optDataPtr = optData;
@@ -249,6 +253,9 @@ void sendSysInfo() {
 
   Serial.print(F("Sending sysInfo frame ... "));
   uint8_t functionId = RESP_SYSTEM_INFO;
+  if (malformed)
+    functionId = 0xF3; // malformed
+
   uint8_t len = FCP_Get_Frame_Length(callsign, optDataLen);
   uint8_t* frame = new uint8_t[len];
   FCP_Encode(frame, callsign, functionId, optDataLen, optDataPtr);
