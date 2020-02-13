@@ -1,10 +1,19 @@
 #ifndef _RADIOLIB_TYPES_H
 #define _RADIOLIB_TYPES_H
+
 #if ARDUINO >= 100
   #include "Arduino.h"
 #else
   #error "Unsupported Arduino version (< 1.0.0)"
 #endif
+
+// version definitions
+#define RADIOLIB_VERSION_MAJOR  (0x03)
+#define RADIOLIB_VERSION_MINOR  (0x02)
+#define RADIOLIB_VERSION_PATCH  (0x03)
+#define RADIOLIB_VERSION_EXTRA  (0x00)
+
+#define RADIOLIB_VERSION ((RADIOLIB_VERSION_MAJOR << 24) | (RADIOLIB_VERSION_MAJOR << 16) | (RADIOLIB_VERSION_MAJOR << 8) | (RADIOLIB_VERSION_EXTRA))
 
 /*
  * Uncomment to enable static-only memory management: no dynamic allocation will be performed.
@@ -66,6 +75,18 @@
 #endif
 
 /*!
+  \brief Alias for unused pin, if not supplied by the Arduino core.
+*/
+#if !(defined(NC) || defined(ARDUINO_ARCH_STM32))
+#define NC                                            (-1)
+#endif
+
+/*!
+  \brief A simple assert macro, will return on error.
+*/
+#define RADIOLIB_ASSERT(STATEVAR) { if(STATEVAR != ERR_NONE) { return(STATEVAR); } }
+
+/*!
   \defgroup shield_config Shield Configuration
 
   \{
@@ -85,26 +106,6 @@
   \brief Use I2C interface.
 */
 #define RADIOLIB_USE_I2C                              0x02
-
-/*!
-  \brief Do not use any interrupts/GPIOs.
-*/
-#define RADIOLIB_INT_NONE                             0x00
-
-/*!
-  \brief Use interrupt/GPIO 0.
-*/
-#define RADIOLIB_INT_0                                0x01
-
-/*!
-  \brief Use interrupt/GPIO 1.
-*/
-#define RADIOLIB_INT_1                                0x02
-
-/*!
-  \brief Use both interrupts/GPIOs.
-*/
-#define RADIOLIB_INT_BOTH                             0x03
 
 /*!
   \}

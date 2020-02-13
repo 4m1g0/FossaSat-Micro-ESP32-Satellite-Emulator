@@ -7,9 +7,10 @@
 #include "../../protocols/PhysicalLayer/PhysicalLayer.h"
 
 // RF69 physical layer properties
+#define RF69_FREQUENCY_STEP_SIZE                      61.03515625
+#define RF69_MAX_PACKET_LENGTH                        64
 #define RF69_CRYSTAL_FREQ                             32.0
 #define RF69_DIV_EXPONENT                             19
-#define RF69_MAX_PACKET_LENGTH                        64
 
 // RF69 register map
 #define RF69_REG_FIFO                                 0x00
@@ -465,6 +466,11 @@ class RF69: public PhysicalLayer {
     int16_t begin(float freq = 434.0, float br = 48.0, float rxBw = 125.0, float freqDev = 50.0, int8_t power = 13);
 
     /*!
+      \brief Reset method. Will reset the chip to the default state using RST pin.
+    */
+    void reset();
+
+    /*!
       \brief Blocking binary transmit method.
       Overloads for string-based transmissions are implemented in PhysicalLayer.
 
@@ -558,11 +564,21 @@ class RF69: public PhysicalLayer {
     void setDio0Action(void (*func)(void));
 
     /*!
+      \brief Clears interrupt service routine to call when DIO0 activates.
+    */
+    void clearDio0Action();
+
+    /*!
       \brief Sets interrupt service routine to call when DIO1 activates.
 
       \param func ISR to call.
     */
     void setDio1Action(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when DIO1 activates.
+    */
+    void clearDio1Action();
 
     /*!
       \brief Interrupt-driven binary transmit method.
@@ -581,11 +597,9 @@ class RF69: public PhysicalLayer {
     /*!
       \brief Interrupt-driven receive method. GDO0 will be activated when full packet is received.
 
-      \param timeout Enable module-driven timeout. Set to false for listen mode.
-
       \returns \ref status_codes
     */
-    int16_t startReceive(bool timeout = false);
+    int16_t startReceive();
 
     /*!
       \brief Reads data received after calling startReceive method.
