@@ -14,8 +14,7 @@
 #define LORA_CODING_RATE                                8       // 4/8, Extended Hamming
 #define LORA_OUTPUT_POWER                               21      // dBm
 #define LORA_CURRENT_LIMIT                              120     // mA
-#define SYNC_WORD_7X                                    0xFF    // sync word when using SX127x
-#define SYNC_WORD_6X                                    0x0F0F  //                      SX126x
+#define SYNC_WORD                                       0x12    // sync word
 
 // satellite callsign
 char callsign[] = "FOSSASAT-1";
@@ -46,7 +45,7 @@ void setup() {
                           LORA_BANDWIDTH,
                           LORA_SPREADING_FACTOR,
                           LORA_CODING_RATE,
-                          SYNC_WORD_7X,
+                          SYNC_WORD,
                           17,
                           (uint8_t)LORA_CURRENT_LIMIT);
   if (state == ERR_NONE) {
