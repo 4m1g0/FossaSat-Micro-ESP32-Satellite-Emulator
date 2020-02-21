@@ -194,6 +194,20 @@ void sendPong() {
   Serial.println();
 }
 
+void retransmit(uint8_t* optData, size_t optDataLen){
+  Serial.print(F("Sending Retransmitted packet frame ... "));
+  int state = Communication_Send_Response(RESP_REPEATED_MESSAGE, optData, optDataLen);
+  if (state == ERR_NONE) {
+    Serial.println(F("sent successfully!"));
+  } else {
+    Serial.print(F("failed, code "));
+    Serial.println(state);
+  }
+
+  Serial.println();
+}
+
+
 void sendSysInfo(bool malformed) {
     // build response frame
   static const uint8_t optDataLen = 7*sizeof(uint8_t) + 3*sizeof(int16_t) + sizeof(uint16_t) + sizeof(uint32_t);
