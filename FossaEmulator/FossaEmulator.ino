@@ -160,15 +160,30 @@ void handleReceivedPacket() {
   }
 }
 
+// string length limit
+#define MAX_STRING_LENGTH                               32
+
+#define MAX_IMAGE_PACKET_LENGTH                         128
+
+// optional data length limit
+#define MAX_OPT_DATA_LENGTH                             128
+
+// radio buffer length limit
+#define MAX_RADIO_BUFFER_LENGTH                         (MAX_STRING_LENGTH + 2 + MAX_OPT_DATA_LENGTH)
+
+int16_t Communication_Send_Response(uint8_t respId, uint8_t* optData = nullptr, size_t optDataLen = 0, bool overrideModem = false) {
+  // build response frame
+  uint8_t len = FCP_Get_Frame_Length(callsign, optDataLen);
+  uint8_t frame[MAX_RADIO_BUFFER_LENGTH];
+  FCP_Encode(frame, callsign, respId, optDataLen, optData);
+
+  // send response
+  return (lora.transmit(frame, len));
+}
+
 void sendPong() {
   Serial.print(F("Sending pong frame ... "));
-  uint8_t functionId = RESP_PONG;
-  uint8_t len = FCP_Get_Frame_Length(callsign);
-  uint8_t* frame = new uint8_t[len];
-  FCP_Encode(frame, callsign, functionId);
-  int state = lora.transmit(frame, len);
-  delete[] frame;
-
+  int state = Communication_Send_Response(RESP_PONG);
   if (state == ERR_NONE) {
     Serial.println(F("sent successfully!"));
   } else {
@@ -178,8 +193,6 @@ void sendPong() {
 
   Serial.println();
 }
-
-
 
 void sendSysInfo(bool malformed) {
     // build response frame
