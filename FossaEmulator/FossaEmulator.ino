@@ -129,6 +129,9 @@ void loop() {
       case 'm':
         sendSysInfo(true);
         break;
+      case 'i':
+        sendPacketInfo();
+        break;
     }
 
     // dump the serial buffer
@@ -197,6 +200,50 @@ void sendPong() {
 void retransmit(uint8_t* optData, size_t optDataLen){
   Serial.print(F("Sending Retransmitted packet frame ... "));
   int state = Communication_Send_Response(RESP_REPEATED_MESSAGE, optData, optDataLen);
+  if (state == ERR_NONE) {
+    Serial.println(F("sent successfully!"));
+  } else {
+    Serial.print(F("failed, code "));
+    Serial.println(state);
+  }
+
+  Serial.println();
+}
+
+void sendPacketInfo(){
+  Serial.print(F("Sending packet info frame ... "));
+
+  static const uint8_t respOptDataLen = 2*sizeof(uint8_t) + 4*sizeof(uint16_t);
+  uint8_t respOptData[respOptDataLen];
+  uint8_t* respOptDataPtr = respOptData;
+
+  // SNR
+  int8_t snr = random(0, 20);
+  memcpy(respOptDataPtr, &snr, sizeof(snr));
+  respOptDataPtr += sizeof(snr);
+
+  // RSSI
+  uint8_t rssi = random(10, 50);
+  memcpy(respOptDataPtr, &rssi, sizeof(rssi));
+  respOptDataPtr += sizeof(rssi);
+
+  uint16_t loraValid = random(1, 200);
+  memcpy(respOptDataPtr, &loraValid, sizeof(loraValid));
+  respOptDataPtr += sizeof(loraValid);
+
+  uint16_t loraInvalid = random(1, 200);
+  memcpy(respOptDataPtr, &loraInvalid, sizeof(loraInvalid));
+  respOptDataPtr += sizeof(loraInvalid);
+
+  uint16_t fskValid = random(1, 200);
+  memcpy(respOptDataPtr, &fskValid, sizeof(fskValid));
+  respOptDataPtr += sizeof(fskValid);
+
+  uint16_t fskInvalid = random(1, 200);
+  memcpy(respOptDataPtr, &fskInvalid, sizeof(fskInvalid));
+  respOptDataPtr += sizeof(fskInvalid);
+
+  int state = Communication_Send_Response(RESP_PACKET_INFO, respOptDataPtr, respOptDataLen);
   if (state == ERR_NONE) {
     Serial.println(F("sent successfully!"));
   } else {
