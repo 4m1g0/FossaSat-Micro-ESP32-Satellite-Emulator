@@ -44,6 +44,8 @@ void setFlag(void) {
 void handleReceivedPacket();
 void sendPong();
 void sendSysInfo(bool malformed = false);
+void decodeGS(uint8_t* respFrame, uint8_t respLen);
+void decodeSat(uint8_t* optData, size_t optDataLen);
 
 void setup() {
   Serial.begin(115200);
@@ -153,6 +155,8 @@ void handleReceivedPacket() {
   if (state == ERR_NONE) {
     PRINT_BUFF(respFrame, respLen);
     Serial.println();
+    decodeGS(respFrame, respLen);
+    decodeSat(respFrame, respLen);
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed
     Serial.println(F("[SX12x8] CRC error!"));
@@ -261,7 +265,6 @@ void sendSysInfo(bool malformed) {
   uint8_t optData[optDataLen];
   uint8_t* optDataPtr = optData;
 
-
   uint8_t mpptOutputVoltage = ((float)random(1800, 3600) / 1000.0) * (VOLTAGE_UNIT / VOLTAGE_MULTIPLIER);
   memcpy(optDataPtr, &mpptOutputVoltage, sizeof(mpptOutputVoltage));
   optDataPtr += sizeof(mpptOutputVoltage);
@@ -338,4 +341,467 @@ void sendSysInfo(bool malformed) {
 
   Serial.println();
 
+}
+
+void sendStatistics(){
+  // TODO: Implement 
+  return;
+
+  /*if(Communication_Check_OptDataLen(1, optDataLen)) {
+
+        // response will have maximum of 109 bytes if all stats are included
+        uint8_t respOptData[109];
+        uint8_t respOptDataLen = 1;
+        uint8_t* respOptDataPtr = respOptData;
+
+        // copy stat flags
+        uint8_t flags = optData[0];
+        memcpy(respOptDataPtr, &flags, sizeof(uint8_t));
+        respOptDataPtr += sizeof(uint8_t);
+
+        if(flags & 0b00000001) {
+          // temperatures
+          PersistentStorage_Read(FLASH_STATS_TEMP_PANEL_Y, respOptDataPtr, 15*sizeof(int16_t));
+          respOptDataPtr += 15*sizeof(int16_t);
+          respOptDataLen += 15*sizeof(int16_t);
+        }
+
+        if(flags & 0b00000010) {
+          // currents
+          PersistentStorage_Read(FLASH_STATS_CURR_XA, respOptDataPtr, 18*sizeof(int16_t));
+          respOptDataPtr += 18*sizeof(int16_t);
+          respOptDataLen += 18*sizeof(int16_t);
+        }
+
+        if(flags & 0b00000100) {
+          // voltages
+          PersistentStorage_Read(FLASH_STATS_VOLT_XA, respOptDataPtr, 18*sizeof(uint8_t));
+          respOptDataPtr += 18*sizeof(uint8_t);
+          respOptDataLen += 18*sizeof(uint8_t);
+        }
+
+        if(flags & 0b00001000) {
+          // lights
+          PersistentStorage_Read(FLASH_STATS_LIGHT_PANEL_Y, respOptDataPtr, 6*sizeof(float));
+          respOptDataPtr += 6*sizeof(float);
+          respOptDataLen += 6*sizeof(float);
+        }
+
+        Communication_Send_Response(RESP_STATISTICS, respOptData, respOptDataLen);
+      }*/
+
+}
+
+
+void sendFullSysInfo() {
+  // TODO: Implement 
+  return;
+
+}
+
+void decodeGS(uint8_t* respFrame, uint8_t respLen) {
+  // print raw data
+  Serial.print(F("Received data from the satelite "));
+  Serial.print(respLen);
+  Serial.println(F(" bytes:"));
+
+  // get function ID
+  uint8_t functionId = FCP_Get_FunctionID(callsign, respFrame, respLen);
+
+  if(functionId != RESP_CAMERA_PICTURE) {
+    // print packet info
+    Serial.print(F("RSSI: "));
+    Serial.print(lora.getRSSI());
+    Serial.println(F(" dBm"));
+    Serial.print(F("SNR: "));
+    Serial.print(lora.getSNR());
+    Serial.println(F(" dB"));
+    Serial.print(F("Function ID: 0x"));
+    Serial.println(functionId, HEX);
+    PRINT_BUFF(respFrame, respLen);
+  }
+
+  // check optional data
+  uint8_t* respOptData = nullptr;
+  uint8_t respOptDataLen = 0;
+  if (functionId < PRIVATE_OFFSET) {
+    // public frame
+    respOptDataLen = FCP_Get_OptData_Length(callsign, respFrame, respLen);
+  } else {
+    // private frame
+    Serial.println("Received private frame. Not supported yet");
+    return;
+  }
+  Serial.print(F("Optional data ("));
+  Serial.print(respOptDataLen);
+  Serial.println(F(" bytes):"));
+  if (respOptDataLen > 0) {
+    // read optional data
+    respOptData = new uint8_t[respOptDataLen];
+    FCP_Get_OptData(callsign, respFrame, respLen, respOptData);
+    
+    if(functionId != RESP_CAMERA_PICTURE) {
+      PRINT_BUFF(respOptData, respOptDataLen);
+    }
+  }
+
+  // process received frame
+  switch (functionId) {
+    case RESP_PONG:
+      Serial.println(F("Pong!"));
+      break;
+
+    case RESP_SYSTEM_INFO: {
+      Serial.println(F("System info:"));
+
+      Serial.print(F("batteryVoltage = "));
+      Serial.print(FCP_Get_Battery_Voltage(respOptData));
+      Serial.println(" V");
+
+      Serial.print(F("batteryChargingCurrent = "));
+      Serial.print(FCP_Get_Battery_Charging_Current(respOptData), 4);
+      Serial.println(" mA");
+
+      uint32_t onboardTime = 0;
+      memcpy(&onboardTime, respOptData + 3, sizeof(uint32_t));
+      Serial.print(F("onboardTime = "));
+      Serial.println(onboardTime);
+
+      uint8_t powerConfig = 0;
+      memcpy(&powerConfig, respOptData + 7, sizeof(uint8_t));
+      Serial.print(F("powerConfig = 0b"));
+      Serial.println(powerConfig, BIN);
+
+      uint16_t resetCounter = 0;
+      memcpy(&resetCounter, respOptData + 8, sizeof(uint16_t));
+      Serial.print(F("resetCounter = "));
+      Serial.println(resetCounter);
+
+      Serial.print(F("voltageXA = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 10));
+      Serial.println(" V");
+
+      Serial.print(F("voltageXB = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 11));
+      Serial.println(" V");
+
+      Serial.print(F("voltageZA = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 12));
+      Serial.println(" V");
+
+      Serial.print(F("voltageZB = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 13));
+      Serial.println(" V");
+
+      Serial.print(F("voltageY = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 14));
+      Serial.println(" V");
+
+      Serial.print(F("batteryTemp = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 15));
+      Serial.println(" deg C");
+
+      Serial.print(F("boardTemp = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 17));
+      Serial.println(" deg C");
+      
+    } break;
+
+    case RESP_PACKET_INFO: {
+      Serial.println(F("Packet info:"));
+
+      Serial.print(F("SNR = "));
+      Serial.print(respOptData[0] / 4.0);
+      Serial.println(F(" dB"));
+
+      Serial.print(F("RSSI = "));
+      Serial.print(respOptData[1] / -2.0);
+      Serial.println(F(" dBm"));
+
+      uint16_t counter = 0;
+      Serial.print(F("valid LoRa frames = "));
+      memcpy(&counter, respOptData + 2, sizeof(uint16_t));
+      Serial.println(counter);
+      
+      Serial.print(F("invalid LoRa frames = "));
+      memcpy(&counter, respOptData + 4, sizeof(uint16_t));
+      Serial.println(counter);
+      
+      Serial.print(F("valid FSK frames = "));
+      memcpy(&counter, respOptData + 6, sizeof(uint16_t));
+      Serial.println(counter);
+      
+      Serial.print(F("invalid FSK frames = "));
+      memcpy(&counter, respOptData + 8, sizeof(uint16_t));
+      Serial.println(counter);
+    } break;
+
+    case RESP_REPEATED_MESSAGE:
+      Serial.println(F("Got repeated message:"));
+      for (uint8_t i = 0; i < respOptDataLen; i++) {
+        Serial.write(respOptData[i]);
+      }
+      Serial.println();
+      break;
+
+    case RESP_DEPLOYMENT_STATE:
+      Serial.println(F("Got deployment counter:"));
+      Serial.println(respOptData[0]);
+      break;
+
+    case RESP_STATISTICS: {
+      Serial.println(F("Got stats:\t\tunit\tmin\tavg\tmax"));
+      // TODO stats parsing
+    } break;
+
+    case RESP_FULL_SYSTEM_INFO: {
+      Serial.println(F("System info:"));
+
+      Serial.print(F("batteryVoltage = "));
+      Serial.print(FCP_Get_Battery_Voltage(respOptData));
+      Serial.println(" V");
+
+      Serial.print(F("batteryChargingCurrent = "));
+      Serial.print(FCP_Get_Battery_Charging_Current(respOptData), 4);
+      Serial.println(" mA");
+
+      uint32_t onboardTime = 0;
+      memcpy(&onboardTime, respOptData + 3, sizeof(uint32_t));
+      Serial.print(F("onboardTime = "));
+      Serial.println(onboardTime);
+
+      uint8_t powerConfig = 0;
+      memcpy(&powerConfig, respOptData + 7, sizeof(uint8_t));
+      Serial.print(F("powerConfig = 0b"));
+      Serial.println(powerConfig, BIN);
+
+      uint16_t resetCounter = 0;
+      memcpy(&resetCounter, respOptData + 8, sizeof(uint16_t));
+      Serial.print(F("resetCounter = "));
+      Serial.println(resetCounter);
+
+      Serial.print(F("voltageXA = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 10));
+      Serial.println(" V");
+
+      Serial.print(F("currentXA = "));
+      Serial.print(FCP_System_Info_Get_Current(respOptData, 11));
+      Serial.println(" mA");
+
+      Serial.print(F("voltageXB = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 13));
+      Serial.println(" V");
+
+      Serial.print(F("currentXB = "));
+      Serial.print(FCP_System_Info_Get_Current(respOptData, 14));
+      Serial.println(" mA");
+
+      Serial.print(F("voltageZA = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 16));
+      Serial.println(" V");
+
+      Serial.print(F("currentZA = "));
+      Serial.print(FCP_System_Info_Get_Current(respOptData, 17));
+      Serial.println(" mA");
+
+      Serial.print(F("voltageZB = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 19));
+      Serial.println(" V");
+
+      Serial.print(F("currentZB = "));
+      Serial.print(FCP_System_Info_Get_Current(respOptData, 20));
+      Serial.println(" mA");
+
+      Serial.print(F("voltageY = "));
+      Serial.print(FCP_System_Info_Get_Voltage(respOptData, 22));
+      Serial.println(" V");
+
+      Serial.print(F("currentY = "));
+      Serial.print(FCP_System_Info_Get_Current(respOptData, 23));
+      Serial.println(" mA");
+
+      Serial.print(F("tempPanelY = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 25));
+      Serial.println(" deg C");
+
+      Serial.print(F("boardTemp = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 27));
+      Serial.println(" deg C");
+
+      Serial.print(F("tempBottom = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 29));
+      Serial.println(" deg C");
+
+      Serial.print(F("batteryTemp = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 31));
+      Serial.println(" deg C");
+
+      Serial.print(F("secBatteryTemp = "));
+      Serial.print(FCP_System_Info_Get_Temperature(respOptData, 33));
+      Serial.println(" deg C");
+
+      float lightVal = 0;
+      memcpy(&lightVal, respOptData + 35, sizeof(float));
+      Serial.print(F("lightPanelY = "));
+      Serial.println(lightVal, 2);
+      
+      memcpy(&lightVal, respOptData + 39, sizeof(float));
+      Serial.print(F("lightTop = "));
+      Serial.println(lightVal, 2);
+
+      uint8_t fault = 0;
+      memcpy(&fault, respOptData + 43, sizeof(uint8_t));
+      Serial.print(F("faultX = 0x"));
+      Serial.println(fault, HEX);
+      
+      memcpy(&fault, respOptData + 44, sizeof(uint8_t));
+      Serial.print(F("faultY = 0x"));
+      Serial.println(fault, HEX);
+      
+      memcpy(&fault, respOptData + 45, sizeof(uint8_t));
+      Serial.print(F("faultZ = 0x"));
+      Serial.println(fault, HEX);
+      
+    } break;
+
+    case RESP_CAMERA_PICTURE: {
+      uint16_t packetId = 0;
+      memcpy(&packetId, respOptData, sizeof(uint16_t));
+      Serial.print(F("Packet ID: "));
+      Serial.println(packetId);
+      
+      char buff[16];
+      if(respOptDataLen < 16) {
+        for(uint8_t i = 0; i < respOptDataLen; i++) {
+          sprintf(buff, "%02x ", respOptData[2 + i]);
+          Serial.print(buff);
+        }
+        Serial.println();
+      } else {
+        for(uint8_t i = 0; i < respOptDataLen/16; i++) {
+          for(uint8_t j = 0; j < 16; j++) {
+            sprintf(buff, "%02x ", respOptData[2 + i*16 + j]);
+            Serial.print(buff);
+          }
+          Serial.println();
+        }
+      }
+    } break;
+
+    default:
+      break;
+  }
+  
+  if (respOptDataLen > 0) {
+    delete[] respOptData;
+  }
+}
+
+
+
+void decodeSat(uint8_t* optData, size_t optDataLen) {
+
+  Serial.print(F("Received data from a ground station. "));
+  Serial.print(optDataLen);
+  Serial.println(F("bytes: "));
+
+  uint8_t functionId = FCP_Get_FunctionID(callsign, optData, optDataLen);
+
+  // execute function based on ID
+  switch (functionId) {
+
+    // public function IDs
+
+    case CMD_PING: {
+      // send pong
+      Communication_Send_Response(RESP_PONG);
+    } break;
+
+    case CMD_RETRANSMIT: {
+        // check message length
+        if (optDataLen <= MAX_STRING_LENGTH) {
+          // respond with the requested data
+          Communication_Send_Response(RESP_REPEATED_MESSAGE, optData, optDataLen);
+        }
+      } break;
+
+    case CMD_RETRANSMIT_CUSTOM: {
+        // check message length
+        if ((optDataLen >= 8) && (optDataLen <= MAX_STRING_LENGTH + 7)) {
+          // check bandwidth value (loaded from array - rest of settings are checked by library)
+          if (optData[0] > 7) {
+            Serial.print(F("Invalid BW "));
+            Serial.println(optData[0]);
+            break;
+          }
+
+          // attempt to change the settings
+          float bws[] = {7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125.0};
+          uint16_t preambleLength = 0;
+          memcpy(&preambleLength, optData + 3, sizeof(uint16_t));
+
+          // change modem configuration
+          Serial.println(F("Asked to retransmit with this configuration: "));
+          Serial.print("BW: "); Serial.println(bws[optData[0]]);
+          Serial.print("SF: "); Serial.println(optData[1]);
+          Serial.print("CR: "); Serial.println(optData[2]);
+          Serial.print("PreambleLen: "); Serial.println(preambleLength);
+          Serial.print("CRC: "); Serial.println(optData[5]?"true":"false");
+          Serial.print("Power: "); Serial.println(optData[6]);
+
+          // configuration changed successfully, transmit response
+          Communication_Send_Response(RESP_REPEATED_MESSAGE_CUSTOM, optData + 7, optDataLen - 7, true);
+        }
+      } break;
+
+    case CMD_TRANSMIT_SYSTEM_INFO: {
+      // send system info via LoRa
+      sendSysInfo();
+    } break;
+
+    case CMD_GET_PACKET_INFO: {
+      sendPacketInfo();
+    } break;
+
+    case CMD_GET_STATISTICS: {
+      sendStatistics();
+    } break;
+
+    case CMD_GET_FULL_SYSTEM_INFO: {
+      sendFullSysInfo();
+    } break;
+
+    case CMD_STORE_AND_FORWARD_ADD: {
+      // TODO:
+    } break;
+
+    case CMD_STORE_AND_FORWARD_REQUEST: {
+      // TODO:
+    } break;
+
+    // private frames below this line
+    case CMD_DEPLOY: 
+    case CMD_RESTART: 
+    case CMD_SET_TRANSMIT_ENABLE: 
+    case CMD_SET_CALLSIGN: 
+    case CMD_SET_SF_MODE: 
+    case CMD_SET_LOW_POWER_ENABLE: 
+    case CMD_SET_MPPT_MODE:
+    case CMD_SET_RECEIVE_WINDOWS: 
+    case CMD_CAMERA_CAPTURE:
+    case CMD_SET_POWER_LIMITS: 
+    case CMD_SET_RTC: 
+    case CMD_RECORD_IMU: 
+    case CMD_RUN_ADCS: 
+    case CMD_GET_PICTURE_BURST: 
+    case CMD_GET_FLASH_CONTENTS: 
+    case CMD_GET_PICTURE_LENGTH: 
+    case CMD_LOG_GPS:
+    case CMD_GET_GPS_LOG: 
+    case CMD_ROUTE:
+        Serial.println(F("Received private command. Not supported yet."));
+        break;
+    default:
+      return;
+  }
 }
